@@ -1,0 +1,13 @@
+GitHub Repository Description (for the "About" section):
+
+🖥️ A Matrix-themed web platform showcasing my programming journey from high school to college. Execute 47 educational projects (Python, Java, C++) or run your own code in 100+ languages. Built with Vite, CodeMirror, Supabase Edge Functions, and custom canvas animations. A modern revamp of my computer science coursework.
+
+---
+
+GitHub Topics/Tags:
+code-execution, portfolio, matrix-theme, educational-projects, vite, supabase, codemirror, multi-language, web-platform, javascript, python, java, cpp, serverless, edge-functions, canvas-animation, code-runner, programming-education, computer-science, full-stack
+
+---
+
+Short Description (280 characters max):
+Modern web platform showcasing educational coding projects with Matrix theme. Run 47 projects or execute custom code in 100+ languages. Built with Vite, Supabase, and CodeMirror.
