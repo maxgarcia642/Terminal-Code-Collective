@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coding Terminal Collective - Matrix Edition</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <canvas id="matrix-bg"></canvas>
+
+  <div id="info-popup" class="info-popup">
+    <div class="info-popup-content">
+      <button class="close-popup" id="close-popup">X</button>
+      <h2>Multi-Language Execution Support</h2>
+      <p>This terminal supports <strong>100+ programming languages</strong> through multiple execution APIs with smart fallback routing:</p>
+      <p class="note"><strong>Note:</strong> Your code must be applicable with a batch input execution model since the code runs on remote execution services where real-time interactive input isn't possible, all inputs are collected upfront from stdin, and are even retrieved sequentially using a next_input() function.</p>
+      <h3>Execution Providers:</h3>
+      <ul>
+        <li><strong>Piston API</strong> (Primary) - 80+ languages including esoterics: Brainfuck, LOLCODE, Rockstar, Befunge-93, Cow, Emojicode, Vyxal</li>
+        <li><strong>Judge0 CE</strong> - 60+ languages: C/C++, Java, Python, Go, Rust, Fortran, Assembly (NASM), Pascal, Ada</li>
+        <li><strong>Glot.io</strong> - Functional/esoteric: Mercury, Idris, Nix, OCaml, Raku, ATS, Elm, Guile</li>
+      </ul>
+      <h3>Popular Languages:</h3>
+      <p>Python, JavaScript, TypeScript, Java, C, C++, C#, Go, Rust, Ruby, PHP, Swift, Kotlin, Scala, R, Perl, Lua, Bash, Haskell, Elixir, Clojure, F#, Dart, Julia, Nim, Crystal, OCaml, Pascal, Fortran, COBOL, D, Groovy, Lisp, Prolog, Erlang, and many more!</p>
+      <h3>How to Use:</h3>
+      <ol>
+        <li>Upload a file OR paste/type code directly</li>
+        <li>The system auto-detects your language</li>
+        <li>Click EXECUTE to run your code</li>
+        <li>The smart router tries multiple APIs for best results</li>
+      </ol>
+      <p class="note"><strong>Note:</strong> Type your input in the input box at the bottom of the output terminal before clicking Execute, or use the sample code which has interactive menus built-in. All inputs are sent to the program when executed.</p>
+    </div>
+  </div>
+
+  <div class="main-container" id="main-container">
+    <div class="hexagon-monitor" id="hexagon-monitor">
+      <button class="close-hexagon" id="close-hexagon">X</button>
+      <div class="hexagon-shape">
+        <div class="hexagon-inner">
+          <div class="output-header">
+            <span class="output-icon">&#9656;</span> OUTPUT TERMINAL
+            <button class="clear-output-btn" id="clear-output-btn" title="Clear Output">CLEAR</button>
+          </div>
+          <div class="output-wrapper">
+            <pre id="output-display">Ready to execute code...</pre>
+          </div>
+          <div class="terminal-input-container">
+            <span class="terminal-input-prompt">&gt;</span>
+            <input type="text" id="terminal-input" placeholder="Type input here and press Enter or Send..." autocomplete="off">
+            <button class="send-input-btn" id="send-input-btn">Send</button>
+          </div>
+          <div class="output-footer">
+            <span class="output-status" id="output-status">Standby</span>
+            <span class="supported-langs">100+ Languages via Multi-API</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="terminal-wrapper" id="terminal-wrapper">
+      <button class="close-terminal" id="close-terminal">
+        <span>POWER OFF</span>
+      </button>
+      <div class="triangle-terminal" id="triangle-terminal">
+        <div class="terminal-header">
+          <div class="terminal-title">
+            <span class="title-bracket">&#9664;</span>
+            CODING TERMINAL COLLECTIVE
+            <span class="title-bracket">&#9654;</span>
+          </div>
+          <button class="execute-btn" id="execute-btn">
+            <span class="btn-icon">&#9654;</span>
+            <span class="btn-text">EXECUTE</span>
+          </button>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="python">
+            <span class="tab-dot"></span>
+            My Python HS CompSci Project
+          </button>
+          <button class="tab" data-tab="java">
+            <span class="tab-dot"></span>
+            My Java AP CompSci Project
+          </button>
+          <button class="tab" data-tab="cpp">
+            <span class="tab-dot"></span>
+            My College C++ Prog Foundations I Project
+          </button>
+          <button class="tab" data-tab="custom">
+            <span class="tab-dot"></span>
+            Upload Your Code
+          </button>
+        </div>
+
+        <div class="tab-content">
+          <div class="code-panel active" id="python-panel">
+            <div class="editor-wrapper" id="python-editor"></div>
+          </div>
+
+          <div class="code-panel" id="java-panel">
+            <div class="editor-wrapper" id="java-editor"></div>
+          </div>
+
+          <div class="code-panel" id="cpp-panel">
+            <div class="editor-wrapper" id="cpp-editor"></div>
+          </div>
+
+          <div class="code-panel" id="custom-panel">
+            <div class="upload-section">
+              <button id="upload-btn" class="upload-btn">
+                <span class="upload-icon">&#128193;</span>
+                Upload File
+              </button>
+              <button id="info-btn" class="info-btn">
+                <span>?</span> Language Info
+              </button>
+              <span id="current-filename" class="filename">No file selected</span>
+              <span id="detected-language" class="detected-lang">Auto-detect enabled</span>
+              <input type="file" id="file-input" accept="*" style="display: none;">
+            </div>
+            <div class="editor-wrapper" id="custom-editor"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="terminal-off-overlay" id="terminal-off-overlay">
+    <div class="power-on-container">
+      <button class="power-on-btn" id="power-on-btn">
+        <span class="power-icon">&#9654;</span>
+        POWER ON
+      </button>
+    </div>
+  </div>
+
+  <footer class="footer collapsed" id="footer">
+    <button class="footer-toggle" id="footer-toggle">
+      <span class="toggle-icon" id="toggle-icon">&#9660;</span>
+    </button>
+    <div class="footer-content" id="footer-content">
+      <p>
+        Any bugs you noticed when executing your code from whichever language you choose?
+        <a href="https://www.linkedin.com/in/maximiliano-garcia642/" target="_blank" rel="noopener noreferrer">Contact and Connect with Maximiliano Garcia</a>
+        and feel free to check out
+        <a href="https://maxgarcia642.github.io/" target="_blank" rel="noopener noreferrer">My Other Projects</a>.
+      </p>
+    </div>
+  </footer>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
