@@ -145,16 +145,36 @@ function createSparkBurst(element) {
   }
 }
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/code-executor`;
-const PISTON_API = 'https://emkc.org/api/v2/piston';
+const JUDGE0_API = 'https://ce.judge0.com';
+
+const JUDGE0_LANG_IDS = {
+  'python': 100,
+  'java': 91,
+  'c++': 105,
+  'cpp': 105,
+  'c': 103,
+  'javascript': 102,
+  'typescript': 101,
+  'csharp': 51,
+  'go': 107,
+  'rust': 108,
+  'ruby': 72,
+  'php': 98,
+  'bash': 46,
+  'perl': 85,
+  'lua': 64,
+  'haskell': 61,
+  'kotlin': 111,
+  'swift': 83,
+  'scala': 112,
+  'r': 80,
+};
 
 const embeddedLanguageMap = {
-  'python': { name: 'python', version: '3.10.0' },
-  'java': { name: 'java', version: '15.0.2' },
-  'cpp': { name: 'c++', version: '10.2.0' },
-  'c++': { name: 'c++', version: '10.2.0' },
+  'python': { name: 'python', version: '3.12.5' },
+  'java': { name: 'java', version: '17.0.6' },
+  'cpp': { name: 'c++', version: '14.1.0' },
+  'c++': { name: 'c++', version: '14.1.0' },
 };
 
 let currentDetectedLanguage = null;
@@ -214,86 +234,57 @@ function analyzeInputCalls(code, langKey) {
 }
 
 async function runCode(code, language, stdin = '') {
-  try {
-    const response = await fetch(EDGE_FUNCTION_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({
-        code: code,
-        language: language.name,
-        stdin: stdin,
-      })
-    });
+  const langName = (language.name || language.key || '').toLowerCase();
+  const langId = JUDGE0_LANG_IDS[langName];
 
-    if (!response.ok) {
-      throw new Error(`Edge function error: ${response.status}`);
-    }
-
-    const text = await response.text();
-    if (!text || text.trim() === '') {
-      throw new Error('Empty response');
-    }
-
-    let result;
-    try {
-      result = JSON.parse(text);
-    } catch {
-      throw new Error('Invalid JSON response');
-    }
-
-    if (result.success) {
-      return { success: true, output: result.output || '(no output)' };
-    } else {
-      return { success: false, output: result.error || 'Unknown error' };
-    }
-  } catch (error) {
-    console.log('Edge function failed, using fallback:', error.message);
-    return await runCodeFallback(code, language, stdin);
+  if (!langId) {
+    return { success: false, output: `Unsupported language: ${langName}` };
   }
-}
 
-async function runCodeFallback(code, language, stdin = '') {
+  const encodedCode = btoa(unescape(encodeURIComponent(code)));
+  const encodedStdin = stdin ? btoa(unescape(encodeURIComponent(stdin))) : '';
+
   try {
-    const response = await fetch(`${PISTON_API}/execute`, {
+    const response = await fetch(`${JUDGE0_API}/submissions?base64_encoded=true&wait=true`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        language: language.name,
-        version: language.version,
-        files: [{ content: code }],
-        stdin: stdin
+        source_code: encodedCode,
+        language_id: langId,
+        stdin: encodedStdin,
       })
     });
 
     if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`);
+      throw new Error(`Judge0 error: ${response.status}`);
     }
 
-    const text = await response.text();
-    if (!text || text.trim() === '') {
-      throw new Error('Empty response from Piston');
+    const result = await response.json();
+
+    const decode = (b64) => {
+      if (!b64) return '';
+      try { return decodeURIComponent(escape(atob(b64))); } catch { return atob(b64); }
+    };
+
+    const stdout = decode(result.stdout);
+    const stderr = decode(result.stderr);
+    const compileOutput = decode(result.compile_output);
+    const statusDesc = result.status?.description || '';
+
+    if (result.status?.id === 6) {
+      return { success: false, output: 'COMPILE ERROR:\n' + (compileOutput || stderr || statusDesc) };
     }
 
-    let result;
-    try {
-      result = JSON.parse(text);
-    } catch {
-      throw new Error('Invalid JSON from Piston');
+    if (result.status?.id >= 7) {
+      const errMsg = stderr || compileOutput || statusDesc;
+      return { success: false, output: `Runtime Error (${statusDesc}):\n${errMsg}` };
     }
 
-    if (result.run) {
-      let output = '';
-      if (result.run.stdout) output += result.run.stdout;
-      if (result.run.stderr) output += '\nSTDERR:\n' + result.run.stderr;
-      if (result.compile && result.compile.stderr) {
-        output = 'COMPILE ERROR:\n' + result.compile.stderr + '\n' + output;
-      }
-      return { success: result.run.code === 0, output: output || '(no output)' };
-    }
-    return { success: false, output: 'Unexpected response from server' };
+    let output = stdout;
+    if (stderr) output += (output ? '\n' : '') + 'STDERR:\n' + stderr;
+
+    const isSuccess = result.status?.id === 3;
+    return { success: isSuccess, output: output || '(no output)' };
   } catch (error) {
     return { success: false, output: 'Execution failed: ' + error.message };
   }
