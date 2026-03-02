@@ -705,24 +705,48 @@ function updateInputAnalysis(code, langKey) {
   const analysis = analyzeInputCalls(code, langKey);
 
   if (!analysis.hasInputs) {
-    analysisEl.innerHTML = '';
+    analysisEl.textContent = '';
     analysisEl.className = 'input-analysis';
-    if (hintEl) hintEl.textContent = 'No input calls detected — stdin area available if needed';
+    if (hintEl) hintEl.textContent = 'No input calls detected \u2014 stdin area available if needed';
     return;
   }
 
-  const loopWarning = analysis.inLoop
-    ? ' <span class="analysis-warning">(some in loops — may need more inputs than shown)</span>'
-    : '';
+  const plural = analysis.count !== 1;
+  const prefix = analysis.inLoop ? 'at least ' : '';
 
+  analysisEl.textContent = '';
   analysisEl.className = 'input-analysis active';
-  analysisEl.innerHTML =
-    `<span class="analysis-icon">&#9888;</span> ` +
-    `Detected <strong>${analysis.count}</strong> input call${analysis.count !== 1 ? 's' : ''}${loopWarning}` +
-    ` — provide <strong>${analysis.inLoop ? 'at least ' : ''}${analysis.count}</strong> line${analysis.count !== 1 ? 's' : ''} below`;
+
+  const icon = document.createElement('span');
+  icon.className = 'analysis-icon';
+  icon.textContent = '\u26A0';
+  analysisEl.appendChild(icon);
+
+  analysisEl.appendChild(document.createTextNode(' Detected '));
+
+  const countBold = document.createElement('strong');
+  countBold.textContent = analysis.count;
+  analysisEl.appendChild(countBold);
+
+  analysisEl.appendChild(document.createTextNode(` input call${plural ? 's' : ''}`));
+
+  if (analysis.inLoop) {
+    const warning = document.createElement('span');
+    warning.className = 'analysis-warning';
+    warning.textContent = ' (some in loops \u2014 may need more inputs than shown)';
+    analysisEl.appendChild(warning);
+  }
+
+  analysisEl.appendChild(document.createTextNode(` \u2014 provide `));
+
+  const needBold = document.createElement('strong');
+  needBold.textContent = `${prefix}${analysis.count}`;
+  analysisEl.appendChild(needBold);
+
+  analysisEl.appendChild(document.createTextNode(` line${plural ? 's' : ''} below`));
 
   if (hintEl) {
-    hintEl.textContent = `One input per line, in the order your code reads them`;
+    hintEl.textContent = 'One input per line, in the order your code reads them';
   }
 }
 
