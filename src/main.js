@@ -159,60 +159,6 @@ const embeddedLanguageMap = {
 
 let currentDetectedLanguage = null;
 
-function analyzeInputCalls(code, langKey) {
-  const patterns = {
-    python: [/\binput\s*\(/g],
-    javascript: [/\bprompt\s*\(/g, /\breadline\s*\(/g, /\brl\.question\s*\(/g],
-    java: [/\.next(?:Line|Int|Double|Float|Long|Short|Byte|Boolean)\s*\(/g],
-    cpp: [/\bcin\s*>>/g, /\bgetline\s*\(/g, /\bscanf\s*\(/g],
-    c: [/\bscanf\s*\(/g, /\bgets\s*\(/g, /\bfgets\s*\(/g],
-    csharp: [/\bConsole\.ReadLine\s*\(/g, /\bConsole\.Read\s*\(/g],
-    go: [/\bfmt\.Scan(?:f|ln)?\s*\(/g, /\bbufio\.NewReader/g],
-    rust: [/\bstdin\(\)\.read_line/g, /\bstd::io::stdin/g],
-    ruby: [/\bgets\b/g, /\bGETS\b/g, /\breadline\b/g],
-    php: [/\bfgets\s*\(\s*STDIN/g, /\breadline\s*\(/g, /\bfscanf\s*\(\s*STDIN/g],
-    r: [/\breadLines\s*\(/g, /\bscan\s*\(/g],
-    perl: [/\b<STDIN>/g, /\bchomp\b/g],
-    lua: [/\bio\.read\s*\(/g],
-    bash: [/\bread\s+/g],
-    haskell: [/\bgetLine\b/g, /\bgetChar\b/g],
-  };
-
-  const key = langKey?.toLowerCase() || 'python';
-  const langPatterns = patterns[key] || patterns.python;
-
-  let totalMatches = 0;
-  const codeLines = code.split('\n');
-  const inputLines = [];
-
-  for (const pattern of langPatterns) {
-    for (let i = 0; i < codeLines.length; i++) {
-      const line = codeLines[i].trim();
-      if (line.startsWith('//') || line.startsWith('#') || line.startsWith('*') || line.startsWith('/*')) continue;
-
-      const matches = line.match(pattern);
-      if (matches) {
-        totalMatches += matches.length;
-        inputLines.push({ line: i + 1, code: line, count: matches.length });
-      }
-    }
-    pattern.lastIndex = 0;
-  }
-
-  const inLoop = codeLines.some(line => {
-    const trimmed = line.trim().toLowerCase();
-    return (trimmed.startsWith('for') || trimmed.startsWith('while')) &&
-      langPatterns.some(p => { p.lastIndex = 0; return p.test(line); });
-  });
-
-  return {
-    count: totalMatches,
-    lines: inputLines,
-    inLoop,
-    hasInputs: totalMatches > 0,
-  };
-}
-
 async function runCode(code, language, stdin = '') {
   try {
     const response = await fetch(EDGE_FUNCTION_URL, {
@@ -379,17 +325,8 @@ async function handleUserInput() {
   const activeTab = document.querySelector('.tab.active').dataset.tab;
 
   if (activeTab === 'custom') {
-    const stdinTextarea = document.getElementById('stdin-textarea');
-    const stdinValue = stdinTextarea ? stdinTextarea.value : '';
-    const combinedStdin = inputValue
-      ? (stdinValue ? stdinValue + '\n' + inputValue : inputValue)
-      : stdinValue;
-
-    if (!combinedStdin) return;
-
-    if (inputValue) {
-      appendToHistory(`\n> ${inputValue}\n\n`);
-    }
+    if (!inputValue) return;
+    appendToHistory(`\n> ${inputValue}\n\n`);
     executeBtn.disabled = true;
     showHexagonMonitor();
 
@@ -399,7 +336,7 @@ async function handleUserInput() {
     currentDetectedLanguage = detected;
 
     status.textContent = 'Executing...';
-    const result = await runCode(code, detected, combinedStdin);
+    const result = await runCode(code, detected, inputValue);
 
     createSparkBurst(outputEl);
     if (result.provider) {
@@ -512,7 +449,7 @@ async function handleUserInput() {
   }
 }
 
-function createEditor(parent, code, language, readOnly = true, onChange = null) {
+function createEditor(parent, code, language, readOnly = true) {
   const langExtension = {
     python: python(),
     java: java(),
@@ -535,27 +472,15 @@ function createEditor(parent, code, language, readOnly = true, onChange = null) 
     '.cm-activeLineGutter': { backgroundColor: 'rgba(0, 255, 0, 0.15)' }
   }, { dark: false });
 
-  const extensions = [
-    basicSetup,
-    langExtension,
-    oneDark,
-    EditorView.editable.of(!readOnly),
-    customTheme
-  ];
-
-  if (onChange) {
-    let debounceTimer = null;
-    extensions.push(EditorView.updateListener.of((update) => {
-      if (update.docChanged) {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(onChange, 500);
-      }
-    }));
-  }
-
   const state = EditorState.create({
     doc: code,
-    extensions
+    extensions: [
+      basicSetup,
+      langExtension,
+      oneDark,
+      EditorView.editable.of(!readOnly),
+      customTheme
+    ]
   });
 
   const view = new EditorView({
@@ -593,9 +518,6 @@ async function executeCode() {
     const detected = detectLanguage(code, filename);
     currentDetectedLanguage = detected;
 
-    const stdinTextarea = document.getElementById('stdin-textarea');
-    const stdinValue = stdinTextarea ? stdinTextarea.value : '';
-
     const status = document.getElementById('output-status');
     const outputEl = document.getElementById('output-display');
     const displayName = getLanguageDisplayName(detected.key);
@@ -603,15 +525,11 @@ async function executeCode() {
     appendToHistory('\n' + '='.repeat(50) + '\n');
     appendToHistory(`Executing ${displayName} (${detected.confidence}% confidence)...\n`);
     appendToHistory(`Provider: Multi-API Smart Router\n`);
-    if (stdinValue) {
-      const lineCount = stdinValue.split('\n').filter(l => l.trim()).length;
-      appendToHistory(`Stdin: ${lineCount} input(s) provided\n`);
-    }
     appendToHistory('='.repeat(50) + '\n\n');
 
     status.textContent = 'Running...';
 
-    const result = await runCode(code, detected, stdinValue);
+    const result = await runCode(code, detected, '');
 
     createSparkBurst(outputEl);
 
@@ -677,7 +595,6 @@ function handleFileUpload(event) {
       langDisplay.innerHTML = `<span class="lang-badge ${confidenceClass}">${displayName}</span> <span class="confidence">(${detected.confidence}% confidence via ${detected.method})</span>`;
     }
 
-    updateInputAnalysis(content, detected.key);
     updateCustomEditorHighlighting(detected.key);
   };
 
@@ -696,60 +613,6 @@ function updateCustomEditorHighlighting(langKey) {
   }[langKey] || javascript();
 }
 
-function updateInputAnalysis(code, langKey) {
-  const analysisEl = document.getElementById('input-analysis');
-  const hintEl = document.getElementById('stdin-hint');
-  const stdinSection = document.getElementById('stdin-section');
-  if (!analysisEl || !stdinSection) return;
-
-  const analysis = analyzeInputCalls(code, langKey);
-
-  if (!analysis.hasInputs) {
-    analysisEl.textContent = '';
-    analysisEl.className = 'input-analysis';
-    if (hintEl) hintEl.textContent = 'No input calls detected \u2014 stdin area available if needed';
-    return;
-  }
-
-  const plural = analysis.count !== 1;
-  const prefix = analysis.inLoop ? 'at least ' : '';
-
-  analysisEl.textContent = '';
-  analysisEl.className = 'input-analysis active';
-
-  const icon = document.createElement('span');
-  icon.className = 'analysis-icon';
-  icon.textContent = '\u26A0';
-  analysisEl.appendChild(icon);
-
-  analysisEl.appendChild(document.createTextNode(' Detected '));
-
-  const countBold = document.createElement('strong');
-  countBold.textContent = analysis.count;
-  analysisEl.appendChild(countBold);
-
-  analysisEl.appendChild(document.createTextNode(` input call${plural ? 's' : ''}`));
-
-  if (analysis.inLoop) {
-    const warning = document.createElement('span');
-    warning.className = 'analysis-warning';
-    warning.textContent = ' (some in loops \u2014 may need more inputs than shown)';
-    analysisEl.appendChild(warning);
-  }
-
-  analysisEl.appendChild(document.createTextNode(` \u2014 provide `));
-
-  const needBold = document.createElement('strong');
-  needBold.textContent = `${prefix}${analysis.count}`;
-  analysisEl.appendChild(needBold);
-
-  analysisEl.appendChild(document.createTextNode(` line${plural ? 's' : ''} below`));
-
-  if (hintEl) {
-    hintEl.textContent = 'One input per line, in the order your code reads them';
-  }
-}
-
 function handleCodeChange() {
   if (!editors.custom) return;
 
@@ -765,8 +628,6 @@ function handleCodeChange() {
     const confidenceClass = detected.confidence >= 90 ? 'high' : detected.confidence >= 70 ? 'medium' : 'low';
     langDisplay.innerHTML = `<span class="lang-badge ${confidenceClass}">${displayName}</span> <span class="confidence">(${detected.confidence}%)</span>`;
   }
-
-  updateInputAnalysis(code, detected.key);
 }
 
 function addCodeInteractivity() {
@@ -808,8 +669,7 @@ function initializeApp() {
     document.getElementById('custom-editor'),
     '# Write or upload your code here!\n# Supported: Python, JavaScript, Java, C++, and 40+ more!\n\nprint("Hello, World!")',
     'python',
-    false,
-    handleCodeChange
+    false
   );
 
   document.querySelectorAll('.tab').forEach(tab => {
